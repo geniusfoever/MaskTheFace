@@ -3,6 +3,9 @@
 # Email: aqeel.anwar@gatech.edu
 
 import argparse
+import copy
+import random
+
 import dlib
 from utils.aux_functions import *
 
@@ -14,6 +17,13 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     "--path",
+    type=str,
+    default="",
+    help="Path to either the folder containing images or the image itself",
+)
+
+parser.add_argument(
+    "--outpath",
     type=str,
     default="",
     help="Path to either the folder containing images or the image itself",
@@ -111,8 +121,25 @@ for i, entry in enumerate(mask_code):
 is_directory, is_file, is_other = check_path(args.path)
 display_MaskTheFace()
 
-if is_directory:
-    path, dirs, files = os.walk(args.path).__next__()
+types=["surgical", "N95", "KN95", "cloth", "gas", "inpaint", "random", "all"]
+types_probability=[0.5,0.6,0.8,1]
+patterns=[]
+for path,_,files in os.walk("./masks/textures/"):
+    for file in files:
+        patterns.append(os.path.join(path,file))
+
+r = lambda: random.randint(0,255)
+def get_random_args(my_arg):
+    my_arg.color_weight=random.random()
+    my_arg.color='#%02X%02X%02X' % (r(),r(),r())
+    for i in range(len(types_probability)):
+        if(random.random()<=types_probability[i]): my_arg.mask_type=types[i]
+    my_arg.pattern=patterns[int(random.random()*len(patterns))]
+    my_arg.pattern_weight=random.random()
+    return my_arg
+def add_mask(walk,my_args):
+    path, dirs, files=walk
+    my_args=copy.deepcopy(my_args)
     file_count = len(files)
     dirs_count = len(dirs)
     if len(files) > 0:
@@ -122,58 +149,22 @@ if is_directory:
     for f in tqdm(files):
         image_path = path + "/" + f
 
-        write_path = path + "_masked"
+        write_path = os.path.join(my_args.outpath, os.path.relpath(path, my_args.path))
         if not os.path.isdir(write_path):
-            os.makedirs(write_path)
-
+            os.makedirs(write_path, exist_ok=True)
+        print(write_path)
         if is_image(image_path):
             # Proceed if file is image
-            if args.verbose:
+            if my_args.verbose:
                 str_p = "Processing: " + image_path
                 tqdm.write(str_p)
 
             split_path = f.rsplit(".")
             masked_image, mask, mask_binary_array, original_image = mask_image(
-                image_path, args
+                image_path, get_random_args(my_args)
             )
             for i in range(len(mask)):
                 w_path = (
-                    write_path
-                    + "/"
-                    + split_path[0]
-                    + "_"
-                    + mask[i]
-                    + "."
-                    + split_path[1]
-                )
-                img = masked_image[i]
-                cv2.imwrite(w_path, img)
-
-    print_orderly("Masking image directories", 60)
-
-    # Process directories withing the path provided
-    for d in tqdm(dirs):
-        dir_path = args.path + "/" + d
-        dir_write_path = args.write_path + "/" + d
-        if not os.path.isdir(dir_write_path):
-            os.makedirs(dir_write_path)
-        _, _, files = os.walk(dir_path).__next__()
-
-        # Process each files within subdirectory
-        for f in files:
-            image_path = dir_path + "/" + f
-            if args.verbose:
-                str_p = "Processing: " + image_path
-                tqdm.write(str_p)
-            write_path = dir_write_path
-            if is_image(image_path):
-                # Proceed if file is image
-                split_path = f.rsplit(".")
-                masked_image, mask, mask_binary, original_image = mask_image(
-                    image_path, args
-                )
-                for i in range(len(mask)):
-                    w_path = (
                         write_path
                         + "/"
                         + split_path[0]
@@ -181,23 +172,67 @@ if is_directory:
                         + mask[i]
                         + "."
                         + split_path[1]
-                    )
-                    w_path_original = write_path + "/" + f
-                    img = masked_image[i]
-                    # Write the masked image
-                    cv2.imwrite(w_path, img)
-                    if args.write_original_image:
-                        # Write the original image
-                        cv2.imwrite(w_path_original, original_image)
+                )
+                img = masked_image[i]
+                cv2.imwrite(w_path, img)
 
-            if args.verbose:
-                print(args.code_count)
+    print_orderly("Masking image directories", 60)
+from multiprocessing import Pool
+
+from itertools import repeat
+
+if is_directory:
+    with Pool(processes=8) as pool:
+        results = pool.map(add_mask, zip(os.walk(args.path, followlinks=True), repeat(args)))
+
+
+        # # Process directories withing the path provided
+        # for d in tqdm(dirs):
+        #     dir_path = args.path + "/" + d
+        #     dir_write_path = args.write_path + "/" + d
+        #     if not os.path.isdir(dir_write_path):
+        #         os.makedirs(dir_write_path)
+        #     _, _, files = os.walk(dir_path).__next__()
+        #
+        #     # Process each files within subdirectory
+        #     for f in files:
+        #         image_path = dir_path + "/" + f
+        #         if args.verbose:
+        #             str_p = "Processing: " + image_path
+        #             tqdm.write(str_p)
+        #         write_path = dir_write_path
+        #         if is_image(image_path):
+        #             # Proceed if file is image
+        #             split_path = f.rsplit(".")
+        #             masked_image, mask, mask_binary, original_image = mask_image(
+        #                 image_path, args
+        #             )
+        #             for i in range(len(mask)):
+        #                 w_path = (
+        #                     write_path
+        #                     + "/"
+        #                     + split_path[0]
+        #                     + "_"
+        #                     + mask[i]
+        #                     + "."
+        #                     + split_path[1]
+        #                 )
+        #                 w_path_original = write_path + "/" + f
+        #                 img = masked_image[i]
+        #                 # Write the masked image
+        #                 cv2.imwrite(w_path, img)
+        #                 if args.write_original_image:
+        #                     # Write the original image
+        #                     cv2.imwrite(w_path_original, original_image)
+
+                # if args.verbose:
+                #     print(args.code_count)
 
 # Process if the path was a file
 elif is_file:
     print("Masking image file")
     image_path = args.path
-    write_path = args.path.rsplit(".")[0]
+    write_path = args.path.rsplit(".",1)[0]
     if is_image(image_path):
         # Proceed if file is image
         # masked_images, mask, mask_binary_array, original_image
@@ -205,7 +240,7 @@ elif is_file:
             image_path, args
         )
         for i in range(len(mask)):
-            w_path = write_path + "_" + mask[i] + "." + args.path.rsplit(".")[1]
+            w_path = write_path + "_" + mask[i] + "." + args.path.rsplit(".",1)[1]
             img = masked_image[i]
             cv2.imwrite(w_path, img)
 else:
