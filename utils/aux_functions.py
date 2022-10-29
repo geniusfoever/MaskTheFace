@@ -567,13 +567,62 @@ def rect_to_bb(rect):
     y2 = rect.bottom()
     return (x1, x2, y2, x1)
 
+def mask_image_from_array(image, args):
+    # Read the image
+    # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = image
 
+    face_locations = args.detector(gray, 1)
+    if not face_locations: return None
+    mask_type = args.mask_type
+    verbose = args.verbose
+    if args.code:
+        ind = random.randint(0, len(args.code_count) - 1)
+        mask_dict = args.mask_dict_of_dict[ind]
+        mask_type = mask_dict["type"]
+        args.color = mask_dict["color"]
+        args.pattern = mask_dict["texture"]
+        args.code_count[ind] += 1
+
+    elif mask_type == "random":
+        available_mask_types = get_available_mask_types()
+        mask_type = random.choice(available_mask_types)
+
+    # Process each face in the image
+    face_location=face_locations[0]
+    shape = args.predictor(gray, face_location)
+    shape = face_utils.shape_to_np(shape)
+    face_landmarks = shape_to_landmarks(shape)
+    face_location = rect_to_bb(face_location)
+    # draw_landmarks(face_landmarks, image)
+    six_points_on_face, angle = get_six_points(face_landmarks, image)
+    mask = []
+    if mask_type != "all":
+        masked_images, _ = mask_face(
+            image, face_location, six_points_on_face, angle, args, type=mask_type
+        )
+
+    else:
+        available_mask_types = get_available_mask_types()
+        for m in range(len(available_mask_types)):
+
+            masked_images, _ = mask_face(
+                image,
+                face_location,
+                six_points_on_face,
+                angle,
+                args,
+                type=available_mask_types[m],
+            )
+
+    return masked_images
 def mask_image(image_path, args):
     # Read the image
     image = cv2.imread(image_path)
     original_image = image.copy()
     # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = image
+
     face_locations = args.detector(gray, 1)
     mask_type = args.mask_type
     verbose = args.verbose

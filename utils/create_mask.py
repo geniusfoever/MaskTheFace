@@ -45,7 +45,6 @@ def texture_the_mask(mask_image, texture_path, intensity):
     orig_shape = mask_image.shape
     bit_mask = mask_image[:, :, 3]
     mask_image = mask_image[:, :, 0:3]
-    print(os.path.abspath(texture_path))
     dir_path = os.path.dirname(os.path.realpath(__file__))
     texture_image = cv2.imread(texture_path)
     texture_image = cv2.resize(texture_image, (orig_shape[1], orig_shape[0]))

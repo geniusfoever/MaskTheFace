@@ -1,3 +1,15 @@
+import copy
+
+import mxnet as mx
+from mxnet import recordio
+import cv2
+import os
+import argparse
+import sys
+parser = argparse.ArgumentParser(description='do dataset merge')
+# general
+parser.add_argument('--include', default=r"B:\Database\glint360k", type=str, help='')
+parser.add_argument('--output', default=r"D:\DataBase\Glint360k", type=str, help='')
 # Author: aqeelanwar
 # Created: 27 April,2020, 10:22 PM
 # Email: aqeel.anwar@gatech.edu
@@ -10,23 +22,7 @@ from utils.aux_functions import *
 
 
 
-# Command-line input setup
-parser = argparse.ArgumentParser(
-    description="MaskTheFace - Python code to mask faces dataset"
-)
-parser.add_argument(
-    "--path",
-    type=str,
-    default="D:\DataBase\Glint360k",
-    help="Path to either the folder containing images or the image itself",
-)
 
-parser.add_argument(
-    "--outpath",
-    type=str,
-    default="",
-    help="Path to either the folder containing images or the image itself",
-)
 parser.add_argument(
     "--mask_type",
     type=str,
@@ -131,6 +127,7 @@ for path,_,files in os.walk("./masks/textures/"):
 
 r = lambda: random.randint(0,255)
 def get_random_args(my_arg):
+
     my_arg.color_weight=random.random()
     my_arg.color='#%02X%02X%02X' % (r(),r(),r())
     for i in range(len(types_probability)):
@@ -138,70 +135,73 @@ def get_random_args(my_arg):
     my_arg.pattern=patterns[int(random.random()*len(patterns))]
     my_arg.pattern_weight=random.random()
     return my_arg
-def add_mask(walk_args):
-    add_mask_single(walk_args[0])
-    # file_count = len(files)
-    # dirs_count = len(dirs)
-    # if len(files) > 0:
-    #     print_orderly("Masking image files", 60)
 
-def add_mask_single(my_args,walk):
-    assert dlib.DLIB_USE_CUDA
-    path, _, files=walk
-    if not files: return
-    img_index_list=[]
-    for f in files:
-        split_path = f.rsplit(".")
-        img_index_list.append(int(split_path[0]))
-    # Process files in the directory if any
-    tqdm.write(path)
-    for f in files:
+random_args_list=[get_random_args(copy.copy(args)) for _ in range(100)]
+output=args.output
+path_imgidx = os.path.join(args.include,"train.idx") # path to train.rec
+path_imgrec = os.path.join(args.include,"train.rec") # path to train.idx
 
-        split_path = f.rsplit(".")
-        img_index=int(split_path[0])
-        if img_index>100000000:
+def extract(start,end,p_id):
+    imgrec = recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')
+    header, s = recordio.unpack(imgrec.read_idx(start))
+
+    a = tqdm(total=end-start,postfix=p_id+1)
+    for i in range(start,end):
+
+        #print(str(header.label))
+        #img = np.array(mx.image.imdecode(s))
+        img = mx.image.imdecode(s).asnumpy()
+        #print(type(img))
+        path = os.path.join(output,str(round(header.label[0])))
+
+        path = os.path.join(path,str(header.id+100000000))
+        if os.path.isfile(path+'.jpg'):
+            header, s = recordio.unpack(imgrec.read())
             continue
-        elif img_index+100000000 in img_index_list:
+        #fig = plt.figure(frameon=False)
+        #fig.set_size_inches(124,124)
+        #ax = plt.Axes(fig, [0., 0., 1., 1.])
+        #ax.set_axis_off()
+        #fig.add_axes(ax)
+        #ax.imshow(img, aspect='auto')
+        #dpi=1
+        #fname= str(i)+'jpg'
+        #fig.savefig(fname, dpi)
+        #plt.savefig(path+'.jpg',bbox_inches='tight',pad_inches=0)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        masked_image = mask_image_from_array(
+            img,random.choice(random_args_list)
+        )
+        if masked_image is None:
+            header, s = recordio.unpack(imgrec.read())
             continue
-        image_path = path + "/" + f
+        #w,h = img.size
+        cv2.imwrite(path+'.jpg',masked_image)
 
-        #write_path = os.path.join(my_args.outpath, os.path.relpath(path, my_args.path))
+        header, s = recordio.unpack(imgrec.read())
+        if i%100==0:
+            a.set_description(str(header.label[0]))
+            a.update(100)
 
-        if is_image(image_path):
-            # Proceed if file is image
-            if my_args.verbose:
-                str_p = "Processing: " + image_path
-                tqdm.write(str_p)
-            masked_image, mask, mask_binary_array, original_image = mask_image(
-                image_path, get_random_args(my_args)
-            )
-            for i in range(len(mask)):
-                w_path = (
-                        path
-                        + "/"
-                        + str(int(split_path[0])+100000000)
-
-                        + "."
-                        + split_path[1]
-                )
-                img = masked_image[i]
-                cv2.imwrite(w_path, img)
-    return
-
-   # print_orderly("Masking image directories", 60)
-from multiprocessing import Pool
-
-from functools import partial
+from multiprocessing import Process
+from tqdm import tqdm
 if __name__ == "__main__":
     # for walk in os.walk(args.path,followlinks=True):
     #     add_mask(walk,args)
     # #print  (list(zip(os.walk(args.path, followlinks=True), repeat(args))))
     # if is_directory:
-    func=partial(add_mask_single, args)
-    # with Pool(processes=args.process) as pool:
-    #     list(tqdm(pool.map(func, os.walk(args.path)),total=360232))
-    pool = Pool(processes=16)
-    for _ in tqdm(pool.imap_unordered(func, os.walk(args.path)), total=360233):
-        pass
-    # for walk in os.walk(args.path):
-    #     add_mask_single(walk)
+    process=args.process
+    total_number=17091657
+    start_end_list=[total_number//process*i for i in range(process)]
+    start_end_list.append(total_number)
+    start_end_list[0]=1
+    process_list=[]
+    for i in range(process):
+        process_list.append(Process(target=extract,args=(start_end_list[i],start_end_list[i+1],i)))
+
+    for p in process_list:
+        p.start()
+
+    for p in process_list:
+        p.join()
