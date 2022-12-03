@@ -141,9 +141,56 @@ output=args.output
 path_imgidx = os.path.join(args.include,"train.idx") # path to train.rec
 path_imgrec = os.path.join(args.include,"train.rec") # path to train.idx
 
-def extract(start,end,p_id):
+
+def extract(start,end,p_id,args_list):
     imgrec = recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')
     header, s = recordio.unpack(imgrec.read_idx(start))
+
+    def blur(img_input):
+        v_kernel_size = random.randrange(1, 3)
+        h_kernel_size = random.randrange(3, 15)
+        # Create the vertical kernel.
+        kernel_v = np.zeros((v_kernel_size, v_kernel_size))
+
+        # Create a copy of the same for creating the horizontal kernel.
+        kernel_h = np.zeros((h_kernel_size, h_kernel_size))
+
+        # Fill the middle row with ones.
+        kernel_v[:, int((v_kernel_size - 1) / 2)] = np.ones(v_kernel_size)
+        kernel_h[int((h_kernel_size - 1) / 2), :] = np.ones(h_kernel_size)
+
+        # Normalize.
+        kernel_v /= v_kernel_size
+        kernel_h /= h_kernel_size
+
+        # Apply the vertical kernel.
+        vertical_mb = cv2.filter2D(img_input, -1, kernel_v)
+
+        # Apply the horizontal kernel.
+        return cv2.filter2D(vertical_mb, -1, kernel_h)
+    def bright_contrast(img_input)
+        brightness = int(random.randrange(175, 340) + (-255))
+        contrast = int(random.randrange(75, 190) + (-127))
+
+        shadow = max(brightness, 0)
+        max = max(255, 255 + brightness)
+
+        al_pha = (max - shadow) / 255
+        ga_mma = shadow
+
+        # The function addWeighted calculates
+        # the weighted sum of two arrays
+        cal = cv2.addWeighted(img_input, al_pha,
+                              img_input, 0, ga_mma)
+
+        Alpha = float(131 * (contrast + 127)) / (127 * (131 - contrast))
+        Gamma = 127 * (1 - Alpha)
+
+        # The function addWeighted calculates
+        # the weighted sum of two arrays
+        return cv2.addWeighted(cal, Alpha,
+                               cal, 0, Gamma)
+
 
     a = tqdm(total=end-start,postfix=p_id+1)
     for i in range(start,end):
@@ -154,10 +201,20 @@ def extract(start,end,p_id):
         #print(type(img))
         path = os.path.join(output,str(round(header.label[0])))
 
-        path = os.path.join(path,str(header.id+100000000))
-        if os.path.isfile(path+'.jpg'):
-            header, s = recordio.unpack(imgrec.read())
-            continue
+        path_0 = os.path.join(path,str(header.id)+'.jpg')
+        path_1 = os.path.join(path,str(header.id+100000000)+'.jpg')
+        path_2 = os.path.join(path,str(header.id+200000000)+'.jpg')
+        path_3 = os.path.join(path,str(header.id+300000000)+'.jpg')
+        path_4 = os.path.join(path,str(header.id+400000000)+'.jpg')
+        path_5 = os.path.join(path,str(header.id+500000000)+'.jpg')
+        path_6 = os.path.join(path,str(header.id+600000000)+'.jpg')
+        #---------------------------------------------------------------------------------------------------------------
+
+        # if os.path.isfile(path+'.jpg'):
+        #     header, s = recordio.unpack(imgrec.read())
+        #     continue
+
+
         #fig = plt.figure(frameon=False)
         #fig.set_size_inches(124,124)
         #ax = plt.Axes(fig, [0., 0., 1., 1.])
@@ -169,15 +226,35 @@ def extract(start,end,p_id):
         #fig.savefig(fname, dpi)
         #plt.savefig(path+'.jpg',bbox_inches='tight',pad_inches=0)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(path_0, img)
 
-        masked_image = mask_image_from_array(
-            img,random.choice(random_args_list)
+        #---------------------------------------------------------------------------------------------------------------
+
+        img_1 = mask_image_from_array(
+            img,random.choice(args_list)
         )
-        if masked_image is None:
-            header, s = recordio.unpack(imgrec.read())
-            continue
-        #w,h = img.size
-        cv2.imwrite(path+'.jpg',masked_image)
+
+        if img_1 is not None:
+            cv2.imwrite(path_1,img_1)
+            img_3=blur(img_1)
+            cv2.imwrite(path_3, img_3)
+            img_5=bright_contrast(img_1)
+            cv2.imwrite(path_5, img_5)
+
+        #---------------------------------------------------------------------------------------------------------------
+
+
+        img_2=blur(img)
+        cv2.imwrite(path_2, img_2)
+
+        #---------------------------------------------------------------------------------------------------------------
+
+
+
+        img_4=bright_contrast(img)
+        cv2.imwrite(path_4, img_4)
+
+
 
         header, s = recordio.unpack(imgrec.read())
         if i%100==0:
@@ -198,7 +275,7 @@ if __name__ == "__main__":
     start_end_list[0]=1
     process_list=[]
     for i in range(process):
-        process_list.append(Process(target=extract,args=(start_end_list[i],start_end_list[i+1],i)))
+        process_list.append(Process(target=extract,args=(start_end_list[i],start_end_list[i+1],i,random_args_list)))
 
     for p in process_list:
         p.start()
