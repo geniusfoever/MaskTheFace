@@ -2,20 +2,14 @@ import copy
 
 import mxnet as mx
 from mxnet import recordio
-import cv2
-import os
 import argparse
-import sys
 parser = argparse.ArgumentParser(description='do dataset merge')
 # general
-parser.add_argument('--include', default=r"B:\Database\glint360k", type=str, help='')
-parser.add_argument('--output', default=r"D:\DataBase\Glint360k", type=str, help='')
+parser.add_argument('--include', default=r"C:\Dataset\glint_umd", type=str, help='')
+parser.add_argument('--output', default=r"E:\dataset\glint\imgs", type=str, help='')
 # Author: aqeelanwar
 # Created: 27 April,2020, 10:22 PM
 # Email: aqeel.anwar@gatech.edu
-
-import argparse
-import random
 
 import dlib
 from utils.aux_functions import *
@@ -168,14 +162,14 @@ def extract(start,end,p_id,args_list):
 
         # Apply the horizontal kernel.
         return cv2.filter2D(vertical_mb, -1, kernel_h)
-    def bright_contrast(img_input)
+    def bright_contrast(img_input):
         brightness = int(random.randrange(175, 340) + (-255))
         contrast = int(random.randrange(75, 190) + (-127))
 
         shadow = max(brightness, 0)
-        max = max(255, 255 + brightness)
+        max_num = max(255, 255 + brightness)
 
-        al_pha = (max - shadow) / 255
+        al_pha = (max_num - shadow) / 255
         ga_mma = shadow
 
         # The function addWeighted calculates
@@ -200,14 +194,13 @@ def extract(start,end,p_id,args_list):
         img = mx.image.imdecode(s).asnumpy()
         #print(type(img))
         path = os.path.join(output,str(round(header.label[0])))
-
+        if not os.path.isdir(path):os.mkdir(path)
         path_0 = os.path.join(path,str(header.id)+'.jpg')
         path_1 = os.path.join(path,str(header.id+100000000)+'.jpg')
         path_2 = os.path.join(path,str(header.id+200000000)+'.jpg')
         path_3 = os.path.join(path,str(header.id+300000000)+'.jpg')
         path_4 = os.path.join(path,str(header.id+400000000)+'.jpg')
         path_5 = os.path.join(path,str(header.id+500000000)+'.jpg')
-        path_6 = os.path.join(path,str(header.id+600000000)+'.jpg')
         #---------------------------------------------------------------------------------------------------------------
 
         # if os.path.isfile(path+'.jpg'):
@@ -269,8 +262,10 @@ if __name__ == "__main__":
     # #print  (list(zip(os.walk(args.path, followlinks=True), repeat(args))))
     # if is_directory:
     process=args.process
-    total_number=17091657
-    start_end_list=[total_number//process*i for i in range(process)]
+    pandding=0
+    total_number=5000000
+    # total_number=17091657
+    start_end_list=[pandding+total_number//process*i for i in range(process)]
     start_end_list.append(total_number)
     start_end_list[0]=1
     process_list=[]
