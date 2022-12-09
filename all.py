@@ -196,6 +196,10 @@ def extract(start,end,p_id,args_list):
         path = os.path.join(output,str(round(header.label[0])))
         if not os.path.isdir(path):os.mkdir(path)
         path_0 = os.path.join(path,str(header.id)+'.jpg')
+        #--------------------------------------------
+        if os.path.isfile(path_0):continue
+        #--------------------------------------------
+
         path_1 = os.path.join(path,str(header.id+100000000)+'.jpg')
         path_2 = os.path.join(path,str(header.id+200000000)+'.jpg')
         path_3 = os.path.join(path,str(header.id+300000000)+'.jpg')
@@ -262,8 +266,8 @@ if __name__ == "__main__":
     # #print  (list(zip(os.walk(args.path, followlinks=True), repeat(args))))
     # if is_directory:
     process=args.process
-    pandding=0
-    total_number=5000000
+    pandding=5000000
+    total_number=1000000
     # total_number=17091657
     start_end_list=[pandding+total_number//process*i for i in range(process)]
     start_end_list.append(total_number)
