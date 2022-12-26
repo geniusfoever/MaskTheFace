@@ -160,41 +160,15 @@ def read_txt(path):
     return info_list
 input_dir=r"E:\Github\insightface\detection\scrfd\data\retinaface\train\images"
 output_dir=r"E:\Github\insightface\detection\scrfd\data\retinaface\train_masked\images"
-def add_mask_single(my_args,img_info,landmark106detector):
-    img=cv2.imread(os.path.join(input_dir,img_info[0]),cv2.IMREAD_COLOR)
-    face = insightface.app.common.Face(kps=img_info[1]['kps'],bbox=img_info[1]['bbox'])
-    landmark106=landmark106detector.get(img,face)
-    for f in files:
-
-        split_path = f.rsplit(".")
-        img_index=int(split_path[0])
-        if img_index>100000000:
-            continue
-        elif img_index+100000000 in img_index_list:
-            continue
-        image_path = path + "/" + f
-
-        #write_path = os.path.join(my_args.outpath, os.path.relpath(path, my_args.path))
-
-        if is_image(image_path):
-            # Proceed if file is image
-            if my_args.verbose:
-                str_p = "Processing: " + image_path
-                tqdm.write(str_p)
-            masked_image, mask, mask_binary_array, original_image = mask_image(
-                image_path, get_random_args(my_args)
-            )
-            for i in range(len(mask)):
-                w_path = (
-                        path
-                        + "/"
-                        + str(int(split_path[0])+100000000)
-
-                        + "."
-                        + split_path[1]
-                )
-                img = masked_image[i]
-                cv2.imwrite(w_path, img)
+def add_mask_single(my_args,landmark106detector,img_info):
+    img_path=os.path.join(input_dir,img_info[0])
+    img=cv2.imread(img_path,cv2.IMREAD_COLOR)
+    faces_infos = img_info[1]
+    for i,face_info in enumerate(faces_infos):
+        face=insightface.app.common.Face(kps=face_info['kps'],bbox=face_info['bbox'])
+        faces_infos[i]['landmark']=landmark106detector.get(cv2.cvtColor(img, cv2.COLOR_BGR2RGB),face)
+    img_result=mask_image_my(img_path,get_random_args(my_args),faces_infos)
+    cv2.imwrite(os.join(output_dir,img_info[0],img_result))
     return
 
    # print_orderly("Masking image directories", 60)
@@ -217,11 +191,11 @@ if __name__ == "__main__":
 
 
 
-    func=partial(add_mask_single, args)
+    func=partial(add_mask_single, args,handler1)
     # with Pool(processes=args.process) as pool:
     #     list(tqdm(pool.map(func, os.walk(args.path)),total=360232))
     pool = Pool(processes=16)
-    for _ in tqdm(pool.imap_unordered(func, os.walk(args.path)), total=360233):
+    for _ in tqdm(pool.imap_unordered(func, info_list)):
         pass
     # for walk in os.walk(args.path):
     #     add_mask_single(walk)

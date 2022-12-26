@@ -684,6 +684,39 @@ def mask_image(image_path, args):
             cc = 1
 
     return masked_images, mask, mask_binary_array, original_image
+def mask_image_my(image_path, args,face_infos):
+    # Read the image
+    image = cv2.imread(image_path)
+    # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    mask_type = args.mask_type
+    verbose = args.verbose
+    if args.code:
+        ind = random.randint(0, len(args.code_count) - 1)
+        mask_dict = args.mask_dict_of_dict[ind]
+        mask_type = mask_dict["type"]
+        args.color = mask_dict["color"]
+        args.pattern = mask_dict["texture"]
+        args.code_count[ind] += 1
+
+    else:
+        available_mask_types = get_available_mask_types()
+        mask_type = random.choice(available_mask_types)
+
+    if verbose:
+        tqdm.write("Faces found: {:2d}".format(len(face_infos)))
+    # Process each face in the image
+    for (i, face_info) in enumerate(face_infos):
+        shape = np.array(face_info['landmark'])
+        face_landmarks = shape_to_landmarks(shape)
+        face_location = [face_info['bbox'][0],face_info['bbox'][1],face_info['bbox'][0]+face_info['bbox'][2],face_info['bbox'][1]+face_info['bbox'][3]]
+        # draw_landmarks(face_landmarks, image)
+        six_points_on_face, angle = get_six_points(face_landmarks, image)
+        image, mask_binary = mask_face(
+            image, face_location, six_points_on_face, angle, args, type=mask_type
+        )
+
+
+    return image
 
 
 def is_image(path):
