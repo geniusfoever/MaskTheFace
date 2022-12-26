@@ -708,7 +708,7 @@ def mask_image_my(image_path, args,face_infos):
     for (i, face_info) in enumerate(face_infos):
         shape = np.array(face_info['landmark'])
         face_landmarks = shape_to_landmarks(shape)
-        face_location = [face_info['bbox'][0],face_info['bbox'][1],face_info['bbox'][0]+face_info['bbox'][2],face_info['bbox'][1]+face_info['bbox'][3]]
+        face_location = np.array([face_info['bbox'][0],face_info['bbox'][1],face_info['bbox'][2]+face_info['bbox'][0],face_info['bbox'][3]+face_info['bbox'][1]]).astype(int)
         # draw_landmarks(face_landmarks, image)
         six_points_on_face, angle = get_six_points(face_landmarks, image)
         image, mask_binary = mask_face(

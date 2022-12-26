@@ -144,16 +144,23 @@ def get_random_args(my_arg):
 def parse_ann_line(line):
     values = [float(x) for x in line.strip().split()]
     bbox = np.array(values[0:4], dtype=np.float32 )
-    kps = np.array( values[4:19], dtype=np.float32 ).reshape((5,3))[:,:2]
+    kps = np.array( values[4:19], dtype=np.float32 ).reshape((5,3))
+    if kps[0][2]<-0.001: return None
+    kps=kps[:,:2]
     return dict(bbox=bbox, kps=kps)
 
 def read_txt(path):
     info_list=[]
+    ground_truth_list = []
+
     for line in open(path, 'r'):
-        ground_truth_list=[]
         if line.startswith('#'):
+
             if ground_truth_list:
-                info_list.append([file_rl,ground_truth_list])
+                if None not in ground_truth_list:
+                    info_list.append([file_rl,ground_truth_list])
+            ground_truth_list = []
+
             file_rl = line[1:].strip()
         else:
             ground_truth_list.append(parse_ann_line(line))
@@ -166,9 +173,21 @@ def add_mask_single(my_args,landmark106detector,img_info):
     faces_infos = img_info[1]
     for i,face_info in enumerate(faces_infos):
         face=insightface.app.common.Face(kps=face_info['kps'],bbox=face_info['bbox'])
-        faces_infos[i]['landmark']=landmark106detector.get(cv2.cvtColor(img, cv2.COLOR_BGR2RGB),face)
+        landmarks=landmark106detector.get(cv2.cvtColor(img, cv2.COLOR_BGR2RGB),face)
+        faces_infos[i]['landmark']=np.array(landmarks)[[1,10,12,14,16,3,5,7,0,23,21,19,32,30,28,26,17,    # 脸颊17点
+                 43,48,49,51,50,      # 左眉毛5点
+                 102,103,104,105,101, # 右眉毛5点
+                 72,73,74,86,78,79,80,85,84, # 鼻子9点
+                 35,41,42,39,37,36,   # 左眼睛6点
+                 89,95,96,93,91,90,   # 右眼睛6点
+                 52,64,63,71,67,68,61,58,59,53,56,55,65,66,62,70,69,57,60,54 # 嘴巴20点
+                 ]]*2
     img_result=mask_image_my(img_path,get_random_args(my_args),faces_infos)
-    cv2.imwrite(os.join(output_dir,img_info[0],img_result))
+    write_path=os.path.join(output_dir,img_info[0])
+    if not os.path.isdir(os.path.dirname(write_path)):
+        os.mkdir(os.path.dirname(write_path))
+
+    cv2.imwrite(os.path.join(output_dir,img_info[0]),img_result)
     return
 
    # print_orderly("Masking image directories", 60)
@@ -190,11 +209,10 @@ if __name__ == "__main__":
     info_list=read_txt(r"C:\Users\beich\Downloads\retinaface_gt_v1.1\train\label.txt")
 
 
-
     func=partial(add_mask_single, args,handler1)
     # with Pool(processes=args.process) as pool:
     #     list(tqdm(pool.map(func, os.walk(args.path)),total=360232))
-    pool = Pool(processes=16)
+    pool = Pool(processes=1)
     for _ in tqdm(pool.imap_unordered(func, info_list)):
         pass
     # for walk in os.walk(args.path):
