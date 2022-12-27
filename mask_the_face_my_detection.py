@@ -159,6 +159,8 @@ def read_txt(path):
             if ground_truth_list:
                 if None not in ground_truth_list:
                     info_list.append([file_rl,ground_truth_list])
+
+                    return info_list
             ground_truth_list = []
 
             file_rl = line[1:].strip()
@@ -173,15 +175,40 @@ def add_mask_single(my_args,landmark106detector,img_info):
     faces_infos = img_info[1]
     for i,face_info in enumerate(faces_infos):
         face=insightface.app.common.Face(kps=face_info['kps'],bbox=face_info['bbox'])
+        print(face)
         landmarks=landmark106detector.get(cv2.cvtColor(img, cv2.COLOR_BGR2RGB),face)
-        faces_infos[i]['landmark']=np.array(landmarks)[[1,10,12,14,16,3,5,7,0,23,21,19,32,30,28,26,17,    # 脸颊17点
+        faces_infos[i]['landmark']=np.array(landmarks).astype(int)[[1,10,12,14,16,3,5,7,0,23,21,19,32,30,28,26,17,    # 脸颊17点
                  43,48,49,51,50,      # 左眉毛5点
                  102,103,104,105,101, # 右眉毛5点
                  72,73,74,86,78,79,80,85,84, # 鼻子9点
                  35,41,42,39,37,36,   # 左眼睛6点
                  89,95,96,93,91,90,   # 右眼睛6点
                  52,64,63,71,67,68,61,58,59,53,56,55,65,66,62,70,69,57,60,54 # 嘴巴20点
-                 ]]*2
+                 ]]
+        center_coordinates = faces_infos[i]['kps'].astype(int)
+        print(face)
+        print(type(face['kps']))
+        # center_coordinates=interpolate_eyebrow(center_coordinates)
+        # Radius of circle
+        radius = 5
+        color1 = np.array([0, 255, 0])
+        color2 = np.array([255, 0, 0])
+
+        # Line thickness of -1 px
+        thickness = -1
+        image = img
+        # Using cv2.circle() method
+        # Draw a circle of red color of thickness -1 px
+        l = len(center_coordinates) - 1
+        for i, center in enumerate(center_coordinates):
+            color = color1 * (1 - (i / l) ** 2) + color2 * (1 - ((l - i) / l) ** 2)
+            color = tuple(map(round, color))
+            image = cv2.circle(image, center, radius, color, thickness)
+
+        cv2.imwrite("4.jpg", cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.waitKey(0)
+
+        cv2.destroyAllWindows()
     img_result=mask_image_my(img_path,get_random_args(my_args),faces_infos)
     write_path=os.path.join(output_dir,img_info[0])
     if not os.path.isdir(os.path.dirname(write_path)):
