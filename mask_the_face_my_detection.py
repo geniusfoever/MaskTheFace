@@ -3,6 +3,7 @@
 # Email: aqeel.anwar@gatech.edu
 
 import argparse
+import copy
 import os
 import random
 
@@ -125,22 +126,29 @@ for i, entry in enumerate(mask_code):
 
 
 types=["surgical", "N95", "KN95", "cloth", "gas", "inpaint", "random", "all"]
-types_probability=[0.7,0.8,0.9,1]
+types_probability=[0,0.7,0.8,0.9,1]
 patterns=[]
 for path,_,files in os.walk("./masks/textures/"):
     for file in files:
         patterns.append(os.path.join(path,file))
 
 r = lambda: random.randint(0,255)
-def get_random_args(my_arg):
-    my_arg.color_weight=random.random()
+def get_random_args(arg):
+    my_arg=copy.deepcopy(arg)
+    type_random=random.random()
+
+    my_arg.color_weight=random.random()*0.3
     my_arg.color='#%02X%02X%02X' % (r(),r(),r())
     for i in range(len(types_probability)):
-        if(random.random()<=types_probability[i]): my_arg.mask_type=types[i]
-    my_arg.pattern=patterns[int(random.random()*len(patterns))]
-    my_arg.pattern_weight=random.random()
+        if(type_random > types_probability[i] and type_random<types_probability[i+1]): my_arg.mask_type=types[i]
+    if random.random()<0.1:
+        my_arg.pattern=patterns[int(random.random()*len(patterns))]
+        my_arg.pattern_weight=random.random()
     return my_arg
 
+random_args_list=[]
+for _ in range(100):
+    random_args_list.append(get_random_args(args))
 def parse_ann_line(line):
     values = [float(x) for x in line.strip().split()]
     bbox = np.array(values[0:4], dtype=np.float32 )
@@ -159,8 +167,6 @@ def read_txt(path):
             if ground_truth_list:
                 if None not in ground_truth_list:
                     info_list.append([file_rl,ground_truth_list])
-
-                    return info_list
             ground_truth_list = []
 
             file_rl = line[1:].strip()
@@ -170,12 +176,12 @@ def read_txt(path):
 input_dir=r"E:\Github\insightface\detection\scrfd\data\retinaface\train\images"
 output_dir=r"E:\Github\insightface\detection\scrfd\data\retinaface\train_masked\images"
 def add_mask_single(my_args,landmark106detector,img_info):
+    landmark106detector=landmark106detector[random.randint(0,1)]
     img_path=os.path.join(input_dir,img_info[0])
     img=cv2.imread(img_path,cv2.IMREAD_COLOR)
     faces_infos = img_info[1]
     for i,face_info in enumerate(faces_infos):
-        face=insightface.app.common.Face(kps=face_info['kps'],bbox=face_info['bbox'])
-        print(face)
+        face=insightface.app.common.Face(kps=face_info['kps'],bbox=np.array([face_info['bbox'][0],face_info['bbox'][1],face_info['bbox'][0]+face_info['bbox'][2],face_info['bbox'][1]+face_info['bbox'][3]]))
         landmarks=landmark106detector.get(cv2.cvtColor(img, cv2.COLOR_BGR2RGB),face)
         faces_infos[i]['landmark']=np.array(landmarks).astype(int)[[1,10,12,14,16,3,5,7,0,23,21,19,32,30,28,26,17,    # 脸颊17点
                  43,48,49,51,50,      # 左眉毛5点
@@ -185,35 +191,10 @@ def add_mask_single(my_args,landmark106detector,img_info):
                  89,95,96,93,91,90,   # 右眼睛6点
                  52,64,63,71,67,68,61,58,59,53,56,55,65,66,62,70,69,57,60,54 # 嘴巴20点
                  ]]
-        center_coordinates = faces_infos[i]['kps'].astype(int)
-        print(face)
-        print(type(face['kps']))
-        # center_coordinates=interpolate_eyebrow(center_coordinates)
-        # Radius of circle
-        radius = 5
-        color1 = np.array([0, 255, 0])
-        color2 = np.array([255, 0, 0])
-
-        # Line thickness of -1 px
-        thickness = -1
-        image = img
-        # Using cv2.circle() method
-        # Draw a circle of red color of thickness -1 px
-        l = len(center_coordinates) - 1
-        for i, center in enumerate(center_coordinates):
-            color = color1 * (1 - (i / l) ** 2) + color2 * (1 - ((l - i) / l) ** 2)
-            color = tuple(map(round, color))
-            image = cv2.circle(image, center, radius, color, thickness)
-
-        cv2.imwrite("4.jpg", cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        cv2.waitKey(0)
-
-        cv2.destroyAllWindows()
-    img_result=mask_image_my(img_path,get_random_args(my_args),faces_infos)
+    img_result=mask_image_my(img_path,random_args_list,faces_infos)
     write_path=os.path.join(output_dir,img_info[0])
     if not os.path.isdir(os.path.dirname(write_path)):
         os.mkdir(os.path.dirname(write_path))
-
     cv2.imwrite(os.path.join(output_dir,img_info[0]),img_result)
     return
 
@@ -236,10 +217,10 @@ if __name__ == "__main__":
     info_list=read_txt(r"C:\Users\beich\Downloads\retinaface_gt_v1.1\train\label.txt")
 
 
-    func=partial(add_mask_single, args,handler1)
+    func=partial(add_mask_single, args,[handler1,handler2])
     # with Pool(processes=args.process) as pool:
     #     list(tqdm(pool.map(func, os.walk(args.path)),total=360232))
-    pool = Pool(processes=1)
+    pool = Pool(processes=6)
     for _ in tqdm(pool.imap_unordered(func, info_list)):
         pass
     # for walk in os.walk(args.path):
